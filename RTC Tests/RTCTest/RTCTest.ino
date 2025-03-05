@@ -1,94 +1,77 @@
-#include <Wire.h>
+//***********************************************************************Libraries***********************************************************************
 #include <SD.h>               // For SD card
 #include <Ethernet.h>         // For Computer Control (W5100.h was edited to have proper address as the P1AM uses the W5500.h internet driver)
-#include <P1AM_Functions.h>   // Custom for writing commands to P1AM
-#include "utility/w5100.h"    // Used for retransmission count and timeou
 #include <P1AM.h>             // For P1AM
-#include <I2C_RTC.h>
-#include <Ponoor_PowerSTEP01Library.h>
+#include <P1_HSC.h>           // For high speed counter
+#include <P1AM_Functions.h>   // Custom for writing commands to P1AM
+#include <P1AM_Serial.h>      // For serial ports
+#include <RS232_Functions.h>  // Custom for writing commands to LCD
+#include "utility/w5100.h"    // Used for retransmission count and timeout
+#include <Wire.h>             // For I2C communication
+#include <RTClib.h>           // For DS3231 RTC (Adafruit RTClib)
 #include <SPI.h>
 
+RTC_DS3231 rtc;  // Use RTClib for DS3231
 
-//***********************************************************************Defines***********************************************************************
+//**********************************************************
 //P1-4ADL2DAL-2
 #define ANALOG_SLOT 3
 //CHANNELS
-#define ANALOG_OUTPUT_CHANNEL1 2
+#define ANALOG_OUTPUT_CHANNEL1 2  //Speed
+#define ANALOG_INPUT_CHANNEL1 1
 //P1-08TRS
 #define OUTPUT_SLOT 1
 //CHANNELS
 #define STOP_START_OUTPUT_CHANNEL 1
-#define OUT_OUTPUT_CHANNEL 2
-#define IN_OUTPUT_CHANNEL 3
+#define OUT_OUTPUT_CHANNEL 2  //FWD
+#define IN_OUTPUT_CHANNEL 3   //REV
 #define LIMIT_LIGHT_OUTPUT_CHANNEL 4
-
-#define nCS_PIN 7
-#define STCK_PIN 6
-#define nSTBY_nRESET_PIN 5
-#define nBUSY_PIN 3
-#define RETURN_ACC 1000  // Acceleration for return movement
-#define RETURN_DEC 1000  // Deceleration for return movement
-
-powerSTEP driver(0, nCS_PIN, nSTBY_nRESET_PIN);
-DS3231 RTC;
-
-//******************************************************************Function Prototypes***********************************************************************
+//P1-08ND3
+#define INPUT_SLOT 2
+//CHANNELS
+#define OUT_INPUT_CHANNEL 1
+#define IN_INPUT_CHANNEL 2
+#define ESTOP_INPUT_CHANNEL 3
+#define MANUAL_START_INPUT_CHANNEL 4
+#define STATE_INPUT_CHANNEL 5
+#define LIMITSWITCH_INPUT_CHANNEL 6
 
 // Global Variables
-int timeInterval, repeats, stepLengthMicrosteps, maxMicrosteps;
+int timeInterval, repeats;
 char timeUnit[10], actionAtMax[10];
 bool startNow, returnTriggered = false;
 int startDay, startMonth, startYear, startHours, startMinutes, startSeconds;
-int totalTraveledMicrosteps = 0;
-const long maxCableLengthMicrosteps = 1024000 ;
-const float MICROSTEPS_PER_METER = 1024000.0 / 5000.0;  // 204.8 microsteps/m
-const int RETURN_SPEED = 500;                          // Slower speed for return movement
+float totalDistanceTraveled = 0.0;  // Total distance traveled in meters
+const float MOTOR_SPEED = 5.0;      // Motor speed in meters per second (5V = 5 m/s)
+unsigned long movementStartTime = 0;  // Tracks when the motor started moving
+float currentPayout = 0.0;  // Tracks the current payout in meters
+int stepLengthMeters;        // Step length in meters
+int maxCableLength;          // Maximum cable length in meters
 
 // Non-blocking control variables
 bool isMoving = false;
-bool routineComplete = false;  // Added to track routine completion
+bool routineComplete = false;
 unsigned long intervalStartTime;
 int currentRepeat = 0;
 
+// LCD update variables
+unsigned long lastLCDUpdate = 0;
+const long lcdInterval = 1000;  // Update LCD every 1 second
+
 void setup() {
   Serial.begin(9600);
-  Serial.println("Stepper Motor Control Program Starting...");
+  while (!Serial)
+    ;           // Wait for Serial Monitor to open
+  delay(1000);  // Small delay to ensure Serial Monitor is ready
 
-  // Initialize hardware
-  pinMode(nSTBY_nRESET_PIN, OUTPUT);
-  pinMode(nCS_PIN, OUTPUT);
-  digitalWrite(nSTBY_nRESET_PIN, HIGH);
-  digitalWrite(nCS_PIN, HIGH);
+  while (!P1.init())
+    ;  // Wait for Modules to Sign on
 
-  SPI.begin();
-  SPI.setDataMode(SPI_MODE3);
-  driver.SPIPortConnect(&SPI);
-
-  // Configure motor
-  driver.configStepMode(STEP_FS_128);
-  driver.setMaxSpeed(1000);
-  driver.setFullSpeed(2000);
-  driver.setAcc(2000);
-  driver.setDec(2000);
-  driver.setSlewRate(SR_520V_us);
-  driver.setOCThreshold(8);
-  driver.setOCShutdown(OC_SD_ENABLE);
-  driver.setPWMFreq(PWM_DIV_1, PWM_MUL_0_75);
-  driver.setVoltageComp(VS_COMP_DISABLE);
-  driver.setSwitchMode(SW_USER);
-  driver.setOscMode(INT_16MHZ);
-  driver.setRunKVAL(64);
-  driver.setAccKVAL(64);
-  driver.setDecKVAL(64);
-  driver.setHoldKVAL(8);
-  driver.setParam(ALARM_EN, 0x8F);
-  driver.getStatus();
-
-  Serial.println("Motor initialized successfully.");
+  Serial.println("Motor Control Program Starting...");
 
   initializeRTC();
-  setRTCTime();
-  handleUserInput();
+  setRTCTime();       // Ask for time first
+  handleUserInput();  // Then ask for other parameters
   waitForStartTime();
   Serial.println("Starting routine...");
 }
@@ -99,9 +82,8 @@ void loop() {
       static unsigned long intervalMillis = 0;
       static unsigned long movementStartTime = 0;
 
-      // Calculate interval once
       if (intervalMillis == 0) {
-        intervalMillis = timeInterval * 1000UL;  // Base in seconds
+        intervalMillis = timeInterval * 1000UL;
         if (strcmp(timeUnit, "minutes") == 0) intervalMillis *= 60;
         else if (strcmp(timeUnit, "hours") == 0) intervalMillis *= 3600;
         else if (strcmp(timeUnit, "days") == 0) intervalMillis *= 86400;
@@ -109,11 +91,10 @@ void loop() {
 
       if (!isMoving) {
         if (currentRepeat < repeats) {
-          // Check interval AFTER previous movement completed
           if (millis() - movementStartTime >= intervalMillis || currentRepeat == 0) {
             executeRoutine();
-            movementStartTime = millis();  // Start timing after movement begins
-            currentRepeat++;               // Increment here to avoid double-counting
+            movementStartTime = millis();
+            currentRepeat++;
           }
         } else {
           handleRoutineCompletion();
@@ -124,14 +105,25 @@ void loop() {
     } else {
       returnToStart();
     }
+  } else {
+    routineComplete = false;
+    returnTriggered = false;
+    currentRepeat = 0;
+    totalDistanceTraveled = 0.0;
+
+    while (Serial.available()) Serial.read();
+
+    Serial.println("\n\n--- New Routine Setup ---");
+    handleUserInput();
+    waitForStartTime();
+    Serial.println("Starting new routine...");
   }
 }
 
 // Date handling functions
 void adjustStartDate() {
-  int daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };  // Removed 'const'
+  int daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
   while (startDay > daysInMonth[startMonth - 1]) {
-    // Update February days dynamically
     if (startMonth == 2) {
       if ((startYear % 4 == 0 && startYear % 100 != 0) || (startYear % 400 == 0)) {
         daysInMonth[1] = 29;
@@ -148,7 +140,6 @@ void adjustStartDate() {
     if (startMonth > 12) {
       startMonth = 1;
       startYear++;
-      // Update for new year's February
       if ((startYear % 4 == 0 && startYear % 100 != 0) || (startYear % 400 == 0)) {
         daysInMonth[1] = 29;
       } else {
@@ -159,26 +150,43 @@ void adjustStartDate() {
 }
 
 void initializeRTC() {
-  RTC.begin();
-  RTC.setHourMode(false);
+  rtc.begin();
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, resetting time to compile time!");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+
   Serial.println("RTC initialized successfully.");
 }
 
 void setRTCTime() {
   Serial.println("Set current RTC time:");
+
   int hours = getValidatedInput("Enter Hours (0-23): ", 0, 23);
   int minutes = getValidatedInput("Enter Minutes (0-59): ", 0, 59);
   int seconds = getValidatedInput("Enter Seconds (0-59): ", 0, 59);
   int day = getValidatedInput("Enter Day (1-31): ", 1, 31);
   int month = getValidatedInput("Enter Month (1-12): ", 1, 12);
-  int year = getValidatedInput("Enter Year (e.g., 2025): ", 2000, 2099);
+  int year = getValidatedInput("Enter Year (2000-2099): ", 2000, 2099);
 
-  RTC.setYear(year - 2000);
-  RTC.setMonth(month);
-  RTC.setDay(day);
-  RTC.setHours(hours);
-  RTC.setMinutes(minutes);
-  RTC.setSeconds(seconds);
+  rtc.adjust(DateTime(year, month, day, hours, minutes, seconds));
+
+  DateTime now = rtc.now();
+  Serial.println("RTC time set to:");
+  Serial.print(now.hour());
+  Serial.print(":");
+  Serial.print(now.minute());
+  Serial.print(":");
+  Serial.print(now.second());
+  Serial.print(" ");
+  Serial.print(now.day());
+  Serial.print("/");
+  Serial.print(now.month());
+  Serial.print("/");
+  Serial.println(now.year());
+
+  delay(2000);
 }
 
 void handleUserInput() {
@@ -190,15 +198,17 @@ void handleUserInput() {
 
     repeats = getValidatedInput("Number of Repeats (1-100): ", 1, 100);
 
-    int cableLengthMeters = getValidatedInput("Total Cable Length (m) (10-5000): ", 10, 5000);
-    maxMicrosteps = round(cableLengthMeters * MICROSTEPS_PER_METER);
+    maxCableLength = getValidatedInput("Total Cable Length (m) (10-5000): ", 10, 5000);
 
-    int stepLengthMeters = getValidatedInput("Step Length (m): ", 1, cableLengthMeters);
-    stepLengthMicrosteps = round(stepLengthMeters * MICROSTEPS_PER_METER);
-
-    if (stepLengthMicrosteps * repeats > maxMicrosteps) {
-      Serial.println("Total movement exceeds cable length!");
-      continue;
+    while (true) {
+      stepLengthMeters = getValidatedInput("Step Length (m): ", 1, maxCableLength);
+      if (stepLengthMeters * repeats > maxCableLength) {
+        Serial.println("Error: Total movement exceeds cable length!");
+        Serial.print("Maximum allowed steps: ");
+        Serial.println(maxCableLength / stepLengthMeters);
+      } else {
+        break;
+      }
     }
 
     const char* actionChoices[] = { "return", "stop" };
@@ -215,24 +225,42 @@ void handleUserInput() {
       input[strcspn(input, "\r\n")] = 0;
 
       float delayHours = atof(input);
+      if (delayHours <= 0) {
+        Serial.println("Invalid delay! Must be a positive number.");
+        continue;
+      }
+
       int delaySeconds = (int)(delayHours * 3600);
+      DateTime now = rtc.now();
+      DateTime startTime = now + TimeSpan(delaySeconds);
 
-      int currentSeconds = RTC.getSeconds() + RTC.getMinutes() * 60 + RTC.getHours() * 3600;
-      int totalSeconds = currentSeconds + delaySeconds;
-
-      startHours = totalSeconds / 3600;
-      startMinutes = (totalSeconds % 3600) / 60;
-      startSeconds = totalSeconds % 60;
-      startDay = RTC.getDay();
-      startMonth = RTC.getMonth();
-      startYear = RTC.getYear() + 2000;
+      startHours = startTime.hour();
+      startMinutes = startTime.minute();
+      startSeconds = startTime.second();
+      startDay = startTime.day();
+      startMonth = startTime.month();
+      startYear = startTime.year();
 
       if (startHours >= 24) {
         startHours -= 24;
         startDay++;
         adjustStartDate();
       }
+
+      Serial.println("Start time calculated:");
+      Serial.print(startHours);
+      Serial.print(":");
+      Serial.print(startMinutes);
+      Serial.print(":");
+      Serial.print(startSeconds);
+      Serial.print(" on ");
+      Serial.print(startDay);
+      Serial.print("/");
+      Serial.print(startMonth);
+      Serial.print("/");
+      Serial.println(startYear);
     }
+
     break;
   }
 }
@@ -242,74 +270,64 @@ void waitForStartTime() {
 
   Serial.println("Waiting for start time...");
   while (true) {
-    if (RTC.getYear() + 2000 == startYear && RTC.getMonth() == startMonth && RTC.getDay() == startDay && RTC.getHours() == startHours && RTC.getMinutes() == startMinutes && RTC.getSeconds() >= startSeconds) {
+    DateTime now = rtc.now();
+    if (now.year() == startYear && now.month() == startMonth && now.day() == startDay && now.hour() == startHours && now.minute() == startMinutes && now.second() >= startSeconds) {
       break;
     }
     delay(50);
   }
 }
 
-// Modify executeRoutine() and returnToStart()
 void executeRoutine() {
   if (!isMoving) {
-    // Store original parameters
-    int originalSpeed = driver.getMaxSpeed();
-
-    // Execute move
-    moveMotor(stepLengthMicrosteps, false);
-    totalTraveledMicrosteps += stepLengthMicrosteps;
+    moveMotor(false);  // Move forward
     displayRealTimeFeedback(currentRepeat + 1, repeats);
-
-    // Immediate restore of speed (accel/decel maintained)
-    driver.setMaxSpeed(originalSpeed);
   }
 }
 
 void returnToStart() {
-  static int originalAcc, originalDec, originalSpeed;
-  static int returnMicrosteps = 0;  // Store distance before resetting
-
   if (!isMoving) {
-    // Save original parameters
-    originalAcc = driver.getAcc();
-    originalDec = driver.getDec();
-    originalSpeed = driver.getMaxSpeed();
-    returnMicrosteps = totalTraveledMicrosteps;  // Store accumulated distance
-
-    // Configure return movement
-    driver.setMaxSpeed(RETURN_SPEED);
-    driver.setAcc(RETURN_ACC);
-    driver.setDec(RETURN_DEC);
-
-    // Initiate return with stored distance
-    moveMotor(returnMicrosteps, true);
+    moveMotor(true);  // Move in reverse
   } else {
-    if (!driver.busyCheck()) {
-      // Restore parameters and reset AFTER movement completes
-      driver.setAcc(originalAcc);
-      driver.setDec(originalDec);
-      driver.setMaxSpeed(originalSpeed);
-      totalTraveledMicrosteps = 0;  // Reset only after successful return
-
+    monitorMovement();
+    if (!isMoving) {
       returnTriggered = false;
       routineComplete = true;
-      Serial.println("Return complete. Speed restored.");
+      Serial.println("Return complete.");
     }
   }
 }
 
-void moveMotor(int microsteps, bool reverse) {
-  if (reverse) driver.move(REV, microsteps);
-  else driver.move(FWD, microsteps);
+void moveMotor(bool reverse) {
+  if (reverse) {
+    runIn(OUTPUT_SLOT, OUT_OUTPUT_CHANNEL, IN_OUTPUT_CHANNEL);  // Reverse direction
+  } else {
+    runOut(OUTPUT_SLOT, OUT_OUTPUT_CHANNEL, IN_OUTPUT_CHANNEL);  // Forward direction
+  }
+  P1.writeAnalog(2048, ANALOG_SLOT, ANALOG_OUTPUT_CHANNEL1);  // Set speed to 5V (5 m/s)
+  movementStartTime = millis();
   isMoving = true;
 }
 
+void stopMotor() {
+  stopSignal(OUTPUT_SLOT, STOP_START_OUTPUT_CHANNEL);
+  clearOutIn(OUTPUT_SLOT, OUT_OUTPUT_CHANNEL, IN_OUTPUT_CHANNEL);
+  isMoving = false;
+  currentPayout = 0.0;
+}
+
 void monitorMovement() {
-  if (!driver.busyCheck()) {
-    isMoving = false;
-    driver.softStop();
-    // Only reset interval timer when movement actually completes
-    intervalStartTime = millis();
+  if (isMoving) {
+    unsigned long currentTime = millis();
+    unsigned long elapsedTime = currentTime - movementStartTime;
+    float elapsedSeconds = elapsedTime / 1000.0;
+    currentPayout = MOTOR_SPEED * elapsedSeconds;
+
+    if (currentPayout >= stepLengthMeters) {
+      stopMotor();
+      intervalStartTime = millis();
+      currentPayout = 0.0;
+    }
   }
 }
 
@@ -337,42 +355,37 @@ int getValidatedInput(const char* prompt, int min, int max) {
   int value;
   while (true) {
     Serial.print(prompt);
-    while (Serial.available() == 0)
+    while (!Serial.available())
       ;
+    while (Serial.available() > 0 && !isdigit(Serial.peek())) {
+      Serial.read();
+    }
     value = Serial.parseInt();
+    Serial.println(value);
     if (value >= min && value <= max) return value;
-    Serial.println("Invalid input. Please try again.");
+    Serial.print("Invalid input! Please enter between ");
+    Serial.print(min);
+    Serial.print(" and ");
+    Serial.println(max);
   }
 }
 
 void getValidatedChoice(const char* prompt, const char* choices[], int numChoices, char* output) {
-  char input[10] = { 0 };  // Initialize buffer to zeros
+  char input[10] = { 0 };
   while (true) {
     Serial.print(prompt);
-
-    // Wait for data to be available
     while (!Serial.available())
       ;
-
-    // Read and trim input
     size_t bytesRead = Serial.readBytesUntil('\n', input, sizeof(input) - 1);
-    input[bytesRead] = 0;  // Null-terminate
-
-    // Trim trailing whitespace and control characters
+    input[bytesRead] = 0;
     for (int i = strlen(input) - 1; i >= 0; i--) {
       if (isspace(input[i]) || input[i] == '\r') input[i] = 0;
       else break;
     }
-
-    // Debug output (uncomment for testing)
-    // Serial.print("Received: ");
-    // Serial.println(input);
-
-    // Compare with valid choices
     for (int i = 0; i < numChoices; i++) {
       if (strcasecmp(input, choices[i]) == 0) {
         strncpy(output, choices[i], 9);
-        output[9] = 0;  // Ensure null termination
+        output[9] = 0;
         return;
       }
     }
