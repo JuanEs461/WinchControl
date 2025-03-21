@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Manual Winch Mode</title>            	
+	<style>                
+		/* Creates the boxes that wrap the text */
+		span.box {	
+			padding: 10px;                           
+			display: inline-block;    
+			height: 35px;
+		}                
+		
+		/* Defines what coulor the box is going to be */
+		.Green {background-color: green;}                
+		.Red {background-color: red;}                
+		.Basic {background-color: black;}                
+		.Yellow {background-color: orange;}				
+		.Clear {border: 0px blue;}				
+		
+		/* Center's "AGO Environmental Winch Monitoring" */
+		h1 {text-align:center;}		
+		
+		/* Effects each box element*/
+		p {
+			text-align:center;				
+			font-size: 30px;	
+			color: white;
+			width: auto;
+			max-height: 55px;
+		}				
+		
+		/* Effects entire webpage, sets background and minimum width */
+		body {		
+			font-family: Arial, sans-serif;
+			background-color: aquamarine;					
+			min-width: 700px;				
+		}		
+
+		.Payout {
+			vertical-align: top;
+			display:inline-block;
+			width: 115px;
+			height: 35px;
+			margin: 0px 0px 0px -10px;
+		}
+		
+		.Speed{
+			vertical-align: top;
+			display: inline-block;
+			width: 125px;
+			height: 35px;
+			margin: 0px 0px 0px -10px;
+		}
+		
+		.Indicator{
+			display: inline-block;
+			width: 150px;
+			padding: 10px;
+		}
+		
+		.Percent{
+			margin: 0px 0px 0px -10px;
+		}
+		
+		/* Locates meter and speed values (padding: top, right, bottom, left) */
+		.Right {padding: 10px 10px 10px 0px;}              
+	</style>
+	<script>
+	// Checks to see if the P1AM mode has toggled from local/remote and then updates to the correct webpage
+	function ReadReload() {
+				  var reloadRequest = "";
+				  var request = new XMLHttpRequest(); 
+				  request.onreadystatechange = function() {
+					if(this.readyState == 4){
+						if(this.status == 200) {
+						// If a response was received from the P1AM
+							if(this.responseText != null) {
+								// Read the response
+								reloadRequest = this.responseText;
+								if(reloadRequest == "Reload") {
+									// Reload the webpage
+									window.location.reload();
+								}
+					}}}}
+					// sends the html request 
+					request.open("GET", "reload_request", true); 
+					request.send(null);
+					GetSwitchAnalogData();
+					// Calls this function every 300ms
+					setTimeout("ReadReload()", 300); 
+				}
+					
+	// Gets P1AM status such as (running? direction? speed? limits?)
+	function GetSwitchAnalogData() { 
+				  var request = new XMLHttpRequest(); 
+				  request.onreadystatechange = function() {
+					if (this.readyState == 4) { 
+					 if(this.status == 200) { 
+					  if (this.responseText != null) { 
+						// Reads response
+						let recieved = this.responseText; 
+						console.log(recieved);
+						// The winch sends updates with '|' inbetween each status, 
+						// then received.split("|") assigns each value to the array
+						let myArray = recieved.split("|"); 
+						document.getElementById("startBox").innerHTML = myArray[0];
+						document.getElementById("startBox").className = myArray[1];
+						document.getElementById("fwdRevBox").innerHTML = myArray[2];
+						document.getElementById("fwdRevBox").className = myArray[3];
+						document.getElementById("speedBox").innerHTML = myArray[4];
+						document.getElementById("speedBox").className = myArray[5];
+						document.getElementById("payoutMeters").innerHTML = myArray[6];
+						document.getElementById("payoutSpeed").innerHTML = myArray[7];
+						document.getElementById("limit").innerHTML = myArray[8];
+						document.getElementById("limit").className = myArray[9];
+						document.getElementById("offset").innerHTML = myArray[10];
+						document.getElementById("offset").className = myArray[11];
+					}}}}
+				// Sends HTML request
+				request.open("GET", "/ajax_switch", true); 
+				request.send(null); }
+	</script>
+</head>
+<!-- Calls the function ReadReload() when the webpage opens -->
+<body onload="ReadReload()">
+	<!-- Prints Header -->
+	<h1>AGO Environmental Winch Monitoring</h1>	
+	<!-- Mode status -->
+	<p><span class="box Basic">Mode: Manual Monitoring</span></p>		
+	<!-- Running status -->
+	<p><span class="box Red" id="startBox">Stopped</span></p>			
+	<!-- Direction -->
+	<p><span class="box Clear" id="fwdRevBox"></span>
+	<!-- Speed -->
+	<span class="box Clear" id="speedBox"></span></p>			
+	<!-- Cable parameters -->
+	<p>
+		<span id="payoutM" class="box Basic">Cable Payout: </span>
+		<span id="payoutMeters" class="Basic Right Payout">0.0m</span>
+		<span id="payoutS" class="box Basic">Cable Speed: </span>
+		<span id="payoutSpeed" class="Basic Right Speed">0.00m/s</span>
+	</p>
+	<!-- Limit status -->
+	<p>
+		<span id="limit" class="Green Indicator">Limits OFF</span>
+		<span id="offset" class="Green Indicator">Offset OFF</span>
+	</p>
+</body>
+</html>

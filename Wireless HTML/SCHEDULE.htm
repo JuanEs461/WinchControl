@@ -1,0 +1,368 @@
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Winch Scheduling Interface</title>
+    <style>
+      /* General Styles */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #e6f7ff;
+        color: #333;
+      }
+      h1, h2 {
+        text-align: center;
+        margin: 20px 0;
+      }
+      .container {
+        max-width: 900px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+      .mode-selector {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+      }
+      .mode-selector button {
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .mode-selector button:hover {
+        background-color: #d1d1d1;
+      }
+      .active-mode {
+        background-color: #4CAF50;
+        color: white;
+      }
+      .form-section {
+        display: none;
+        margin-top: 20px;
+      }
+      .form-section.active {
+        display: block;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input, select, button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .controls {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+      }
+      .controls button {
+        width: 48%;
+        padding: 15px;
+        font-size: 18px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .controls .lock {
+        background-color: #ff9800;
+        color: white;
+      }
+      .controls .lock:hover {
+        background-color: #e68900;
+      }
+      .controls .return-to-start {
+        background-color: #f44336;
+        color: white;
+      }
+      .controls .return-to-start:hover {
+        background-color: #d32f2f;
+      }
+      .trigger-indicator {
+        text-align: center;
+        margin-top: 10px;
+        font-weight: bold;
+        color: #333;
+      }
+      .trigger-indicator span {
+        color: green;
+      }
+      .task-queue {
+        margin-top: 20px;
+      }
+      .task-queue h3 {
+        text-align: center;
+      }
+      .task-queue table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .task-queue table, .task-queue th, .task-queue td {
+        border: 1px solid #ccc;
+      }
+      .task-queue th, .task-queue td {
+        text-align: left;
+        padding: 10px;
+      }
+      .task-queue th {
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Winch Scheduling Interface</h1>
+    <div class="container">
+      <!-- Mode Selection -->
+      <div class="mode-selector">
+        <button id="time-mode" class="active-mode" onclick="selectMode('time')">Time Mode</button>
+        <button id="trigger-mode" onclick="selectMode('trigger')">Trigger Mode</button>
+      </div>
+
+      <!-- Time Mode Form -->
+      <div id="time-form" class="form-section active">
+        <h2>Time Mode</h2>
+        <label for="time-interval">Time Interval</label>
+        <select id="time-interval"></select>
+
+        <label for="time-unit">Time Unit</label>
+        <select id="time-unit">
+          <option value="seconds">Seconds</option>
+          <option value="minutes">Minutes</option>
+          <option value="hours">Hours</option>
+          <option value="days">Days</option>
+        </select>
+
+        <label for="time-repeats">Number of Repeats</label>
+        <select id="time-repeats"></select>
+
+        <label for="time-step-length">Step Length (meters)</label>
+        <input type="number" id="time-step-length" min="0" max="5000" placeholder="Enter length (max 5000)">
+
+        <label for="start-time">Start Time</label>
+        <select id="start-time">
+          <option value="now">Now</option>
+        </select>
+      </div>
+
+      <!-- Trigger Mode Form -->
+      <div id="trigger-form" class="form-section">
+        <h2>Trigger Mode</h2>
+        <div class="trigger-indicator">
+          Trigger State: <span id="trigger-state">Waiting...</span>
+        </div>
+        <label for="trigger-length">Payout (m)</label>
+        <input type="number" id="trigger-length" min="0" max="5000" placeholder="Enter length (max 5000)">
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button id="lock-button" class="lock" onclick="lockCable()">Lock</button>
+        <button id="return-to-start-button" class="return-to-start" onclick="returnToStart()">Return to Start</button>
+      </div>
+
+      <!-- Task Queue -->
+      <div class="task-queue">
+        <h3>Task Queue</h3>
+        <button onclick="queueTask()">Queue Task</button>
+        <button onclick="clearQueue()">Clear Queue</button>
+        <table>
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>Parameters</th>
+            </tr>
+          </thead>
+          <tbody id="task-queue-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const taskQueue = [];
+      let isLocked = false;
+
+      window.addEventListener('DOMContentLoaded', () => {
+        // Populate Time Mode dropdowns
+        populateSelect('time-interval', 59, 1, (val) => val + 1);
+        populateSelect('time-repeats', 100, 1, (val) => val + 1);
+        populateSelect('start-time', 24, 0.25, (val) => val === 0 ? 'Now' : val.toFixed(2));
+
+        // Populate Trigger Mode dropdowns
+        populateSelect('trigger-repeat', 100, 1, (val) => val + 1);
+      });
+
+    function populateSelect(id, max, step, displayFunc) {
+      console.log(`Populating select for ${id}`); // Debugging statement
+      const selectElement = document.getElementById(id);
+      if (!selectElement) {
+        console.error(`Element with id ${id} not found`);
+        return;
+      }
+      for (let i = 0; i <= max; i += step) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = displayFunc(i);
+        selectElement.appendChild(option);
+      }
+    }
+
+    function sendCommand() {
+     const activeMode = document.querySelector('.active-mode').id.split('-')[0];
+     const url = '/task';
+     const params = {};
+
+     if (activeMode === 'time') {
+       params.mode = 'Time';
+       params.timeInterval = document.getElementById('time-interval').value;
+       params.timeUnit = document.getElementById('time-unit').value;
+       params.repeats = document.getElementById('time-repeats').value;
+       params.stepLength = document.getElementById('time-step-length').value;
+       params.startTime = document.getElementById('start-time').value;
+       params.locked = document.getElementById('lock-button').classList.contains('button-pressed') ? "Locked" : "Unlocked";
+     } else if (activeMode === 'trigger') {
+       params.mode = 'Trigger';
+       params.stepLength = document.getElementById('trigger-length').value;
+     }
+
+     const xhr = new XMLHttpRequest();
+     xhr.open('POST', url, true);
+     xhr.setRequestHeader('Content-Type', 'application/json');
+     xhr.onload = function () {
+       if (xhr.status === 200) {
+         alert(xhr.responseText);
+       } else {
+         alert('Failed to send task to Arduino.');
+       }
+     };
+     xhr.send(JSON.stringify(params));
+   }
+
+   function sendCommand() {
+    const activeMode = document.querySelector('.active-mode').id.split('-')[0];
+    const url = '/task'; // Arduino's endpoint
+    const params = {};
+
+    // Collect parameters based on active mode
+    if (activeMode === 'time') {
+      params.mode = 'Time';
+      params.timeInterval = document.getElementById('time-interval').value;
+      params.timeUnit = document.getElementById('time-unit').value;
+      params.repeats = document.getElementById('time-repeats').value;
+      params.stepLength = document.getElementById('time-step-length').value;
+      params.startTime = document.getElementById('start-time').value;
+    } else if (activeMode === 'trigger') {
+      params.mode = 'Trigger';
+      params.stepLength = document.getElementById('trigger-length').value;
+    }
+
+    // Send HTTP POST request
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        alert('Task sent successfully: ' + xhr.responseText);
+      } else {
+        alert('Failed to send task to Arduino.');
+      }
+    };
+    xhr.send(JSON.stringify(params));
+  }
+
+
+  function queueTask() {
+    const activeMode = document.querySelector('.active-mode').id.split('-')[0];
+    const params = {};
+
+        // Collect inputs based on the active mode
+    if (activeMode === 'time') {
+      params.mode = 'Time';
+      params.timeInterval = document.getElementById('time-interval').value;
+      params.timeUnit = document.getElementById('time-unit').value;
+      params.repeats = document.getElementById('time-repeats').value;
+      params.stepLength = document.getElementById('time-step-length').value;
+      params.startTime = document.getElementById('start-time').value;
+    } else if (activeMode === 'trigger') {
+      params.mode = 'Trigger';
+      params.stepLength = document.getElementById('trigger-length').value;
+    }
+
+        // Add lock status to task parameters
+    params.locked = isLocked ? 'Locked' : 'Unlocked';
+
+        // Validate entries
+    const missingFields = Object.entries(params).filter(([key, value]) => !value);
+    if (missingFields.length > 0) {
+      alert(`Missing fields: ${missingFields.map(([key]) => key).join(', ')}`);
+      return;
+    }
+
+        // Store the task and update the display
+    taskQueue.push(params);
+    updateTaskQueueDisplay();
+    clearInputs(activeMode);
+  }
+
+  function clearQueue() {
+    taskQueue.length = 0;
+    updateTaskQueueDisplay();
+  }
+
+  function clearInputs(mode) {
+    if (mode === 'time') {
+      document.getElementById('time-interval').value = '';
+      document.getElementById('time-unit').value = 'seconds';
+      document.getElementById('time-repeats').value = '';
+      document.getElementById('time-step-length').value = '';
+      document.getElementById('start-time').value = 'now';
+    } else if (mode === 'trigger') {
+      document.getElementById('trigger-length').value = '';
+    }
+  }
+
+  function updateTaskQueueDisplay() {
+    const tbody = document.getElementById('task-queue-body');
+    tbody.innerHTML = taskQueue
+    .map(
+      (task, index) =>
+      `<tr>
+      <td>${task.mode}</td>
+      <td>${JSON.stringify(task)}</td>
+      </tr>`
+      )
+    .join('');
+  }
+
+      // Function to switch between modes
+  function selectMode(mode) {
+    document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
+    document.getElementById(`${mode}-form`).classList.add('active');
+    document.querySelectorAll('.mode-selector button').forEach(button => button.classList.remove('active-mode'));
+    document.getElementById(`${mode}-mode`).classList.add('active-mode');
+  }
+
+  function lockCable() {
+    isLocked = !isLocked;
+    document.getElementById('lock-button').textContent = isLocked ? 'Unlock' : 'Lock';
+  }
+
+  function returnToStart() { /* AJAX return-to-start implementation */ }
+  </script>
+  </body>
+  </html>

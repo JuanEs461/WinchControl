@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html><head>
+  <title>Winch Control</title>
+  <link rel="icon" href="C:\Users\Co-op Student\Desktop\Final Phoenix Documents\Final Phoenix Documents\Wireless HTML\logo.png" type="image/png">
+  <style>
+    /* General styles */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #e6f7ff;
+      min-width: 700px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin: 20px 0;
+    }
+     
+	/* Styles for button box */
+    /* Button styles */
+    .button {
+      padding: 15px 30px;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background-color 0.3s;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .button:hover {
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    .buttonGreen {
+      background-color: #4CAF50;
+    }
+    .buttonGreen:active {
+      background-color: #45a049;
+    }
+    .buttonRed {
+      background-color: #E53935;
+    }
+    .buttonRed:active {
+      background-color: #D32F2F;
+    }           
+	
+	
+	/* Setting the gap betweem mode and e-stop box and font size */
+	span {
+		margin: 10px 3.4%; 
+		font-size: 20px;
+	}		
+	
+	/* A div class that centers */
+	.centered {
+		text-align:center;			
+		color: #333;			
+		margin: 20px;		
+	}		
+	
+	/* Div class for max, min, start, and stop */
+	.control-panel{
+		position:relative;			
+		text-align:center; 
+		margin:auto;			
+		min-width: 615px; 
+		white-space: nowrap;
+	}		
+	
+	.cable-info-panel{
+		position:relative;			
+		text-align:center; 
+		margin:auto;			
+		min-width: 615px; 
+		white-space: nowrap;
+	}
+	
+	
+	/* Positioning start */
+	.start-position{
+		display:inline-block;
+	}		
+	
+	/* Positioning stop */
+	.stop-position{
+		display:inline-block;
+	}		
+	
+	/* Mode and e-stop boxes */
+	div.box {			
+		padding: 15px;			
+		text-align: center;			
+		font-size: 20px;		
+	}		
+	
+	/* Set box colour */
+	.Red {background-color: #FC0303;}		
+	.Green {background-color: #4CAF50;}		
+	
+	/* Running and cable parameter boxes */
+	label.box {			
+		text-align: center;			
+		display:inline;
+		font-size: 30px;			
+		color: white;
+		border-radius: 10px;			
+	}		
+	
+	.cable-box{			
+		font-size: 30px;			
+		color: white;	
+		background-color: #333;	
+    border-radius: 10px;
+    padding: 15px;
+		display:inline-block;
+	}
+	
+	.cableValues{
+		display:inline-block;
+		text-align: left;
+		width: 123px;
+	}
+	
+	.toggleSwitches{
+		width: 185px;
+	}
+	
+	.cableLabels{
+		display:inline-block;
+		width: 185px;
+	}
+	
+	/* Set the padding depending on how the boxes are displayed */
+	.Full {padding: 10px; color: white;}		
+	.Middle {padding: 10px 0px 10px 0px;}		
+	.Left {padding: 10px 0px 10px 10px;}		
+	.Right {padding: 10px 10px 10px 0px;}		
+	.Basic {background-color: #333;}		
+	.Yellow {background-color: orange;}		
+	.Clear {border: 0px blue;}		
+
+	/* div for the range */
+	.input-wrapper {  
+		padding: 10px 0;  
+		box-sizing: border-box;  
+		position: relative;  
+		min-height: 60px;  
+		display: grid;  
+		place-items: center;
+	}
+
+	
+	/* Sets the size of the range thumb */
+	input[type="range"],input[type="range"] + datalist {  
+		--thumb-width: 16px;  
+		--thumb-height: 16px;
+	}
+	
+	/* Div for slider bar */
+	.parent-input {  
+		--input-height: 1rem;  
+		--input-color: blue;  
+		position: relative;  
+		display: flex;
+	}
+	
+	/* Style slider */
+	input[type="range"] {  
+		width: 100%;  
+		max-width: 100%;  
+		appearance: none;  
+		height: var(--input-height);  
+		border-radius: var(--input-height);  
+		accent-color: green; 
+		width:90vw;
+	}
+	
+	/* style Chrome range and thumb */
+	.range-control[type="range"]::-webkit-slider-runnable-track {  
+		-webkit-appearance: none;  
+		height: 10px;  
+		position: absolute;  
+		top: 0px;  
+		width: 100%;  
+		left: 0;  
+		right: 0;  
+		cursor: pointer;
+	}
+	.range-control[type="range"]::-webkit-slider-thumb {  
+		background-color: blue;  
+		border: 1px solid #000000;  
+		box-sizing: border-box;  
+		height: var(--thumb-height) ;  
+		width: var(--thumb-width);  
+		-webkit-appearance: none;  
+		border-radius: 50%;  
+		cursor: pointer;  
+		margin-top:2px;
+	}
+	
+	/* Slider bar styling */
+	.parent-input::before {  
+		content: "";  
+		width: var(--before-width, 0);  
+		height: var(--input-height, 0);  
+		border-radius: var(--input-height);  
+		pointer-events: none;  
+		position: absolute;  
+		background-color: blue;  
+		top: 50%;  
+		transform: translateY(-50%);  
+		left: var(--before-left, 0);
+	}
+	
+	/* Styling slider ticks */
+	.range-list {  
+		margin-top: -12px;  
+		box-sizing: border-box;  
+		width: 100%;  
+		z-index: 0;  
+		display: flex;  
+		justify-content: space-between;  
+		position: absolute;  
+		top: 30px;  
+		left: 0;  
+		right: 0;
+	}
+	.range-list option {  
+		--option-width: calc((100% - 12px) / (var(--list-length) - 1));  
+		display: inline-block;  
+		padding-top: calc(var(--thumb-height) / 2);  
+		width: var(--option-width);  
+		text-align: center;  
+		position: relative;  
+			&::before {    
+				content: "";    
+				position: absolute;    
+				border-left: 1px;    
+				width: 1px;    
+				height: 5px;    
+				border-left: 1px solid #000000;   
+				top: 0;    
+				left: 50%;    
+				margin-left: -var(--option-width);  
+			}
+	}
+	.range-list option:first-child {  
+		width: calc((100% - var(--thumb-width)) / ((var(--list-length) - 1) * 2) + var(--thumb-width) / 2  );  
+		text-align: left;  
+		&::before {    
+			left: 7px;    
+			margin-left: unset;  
+		}
+	}
+	.range-list option:last-child {  
+		width: calc((100% - 12px) / ((var(--list-length) - 1) * 2) + 6px);  
+		text-align: right;  
+		&::before {    
+			left: unset;    
+			margin-left: unset;    
+			right: 7px;  
+		}
+	}
+	
+	/* Styling max and min settings */
+	.number {	  
+		vertical-align:bottom;	  
+		width:60px;	  
+		padding: 4px 10px;	  
+		border: 1px solid #bbb;	  
+		border-radius: 5px;	  
+		color: black;	
+	}
+	
+	/* Moves max limit to the left */
+	.MaxLimitLabel {
+		position: relative; 
+		right: 16px; 
+		top: -20px; 
+		display: inline-block; 
+		width: 0;
+	}		
+	
+	/* Moves min limit to the right */
+	.MinLimitLabel {
+		position: relative; 
+		left: -105px; 
+		top: -20px; 
+		display: 
+		inline-block; 
+		width: 0;
+	}
+	
+	.cablePayoutLabel {
+		position: relative;
+		left: 0px;
+		top: 0px;
+		display: inline-block;
+		width: 0;
+	}
+	
+	/* Set limit margins */
+	.leftMargin {margin: 0 30px 10px 0;}
+	.rightMargin { margin: 0 0 10px 30px;}
+	
+	/* Locating NMEA string */        
+	div.fixed {
+		position: fixed;
+		top: 0;
+		left: 0;
+	}
+	</style>                                                                                                                                                                                                                                                                                                                                               
+</head>
+<!-- if the webpage is about to close BeforeClose() is called. When the webpage is loaded ReadReload() is called -->
+<body onbeforeunload="return BeforeClose()" onload="ReadReload()"> 
+	<!-- Prints Header -->
+	<h1>AGO Environmental Winch Controls</h1>
+	<!-- Mode status -->
+	<div class="box">
+		<span class="Full Basic">Mode: Computer Controls</span>
+	</div>
+	<!-- E-stop status box -->
+	<div class="box">
+		<span class="Full Green" id="eBox" style="border-style: solid; border-color: black">Ready to run</span>
+	</div>
+	<div class="control-panel">
+		<!-- Max limit -->
+		<label for="maxLimit" id="maxLimitLabel" class="MaxLimitLabel">Set MAX Limit (m)</label>
+		<input type="number" class="number leftMargin" id="maxLimit" value="0.0" min="0.0" max="9999.9" step="0.5" onchange="SetMaxLimit()"><!--minLimitLimitSet-->
+		<!-- Start Button -->
+		<div class="start-position">
+			<button type="button" class="button buttonGreen" id="startButton" onclick="StartPressed()">Start</button>
+		</div>
+		<!-- Stop Button -->
+		<div class="stop-position">
+			<button type="button" class="button buttonRed" id="stopButton" onclick="StopPressed()">Stop</button>
+		</div>
+		<!-- Min limit -->
+		<input type="number" class="number rightMargin" id="minLimit" value="0.0" min="0.0" max="9999.9" step="0.5" onchange="SetMinLimit()"><!--minLimitLimitSet-->
+		<label for="minLimit" id="minLimitLabel" class="MinLimitLabel">Set MIN Limit (m)</label>
+	</div>
+	<div class="input-wrapper">
+		<div class="parent-input">
+			<!-- Range (Slider) -->
+			<input type="range" id="speedSlider" min="-120" max="120" list="range-list" step="1" class="range-control" oninput="sliderPreProcessing()" onchange="sliderPreProcessing()">
+			<!-- Sets the label of all slider ticks -->
+			<datalist id="range-list" class="range-list" style="--list-length: 13;">
+				<option value="-120">100</option><option>80</option><option>60</option><option>40</option><option>20</option><option>OUT</option>
+				<option>&nbsp;</option><option>IN</option><option>20</option><option>40</option><option>60</option><option>80</option><option value="">100</option>
+			</datalist>
+		</div>
+	</div>
+	<!-- Running status message -->
+	<div class="centered">
+		<label for="startButton" id="startLabel" class="box Middle Basic">Stopped</label>
+		<label for="outButton" id="outLabel" class="box Middle Basic"></label>
+		<label for="speedSlider" id="speedValue" class="box Middle Basic"></label>
+	</div>
+	<!-- Cable parameters -->
+	<div class="cable-info-panel">
+		<div class="cable-box">
+			<label id="payoutM" class="cableLabels">Cable Payout: </label>
+			<label id="payoutMeters" class="cableValues">0.0m</label>
+		</div>
+		<div class="cable-box">
+			<label id="payoutS" class="cableLabels">Cable Speed: </label>
+			<label id="payoutSpeed" class="cableValues">0.00m/s</label>
+		</div>
+	</div>
+	<!-- Limit toggle-->
+	<div class="centered">
+		<button type="button" class="button buttonGreen toggleSwitches" id="limitToggle" onclick="LimitPressed()">Limits OFF</button>
+		<button type="button" class="button buttonGreen toggleSwitches" id="offsetToggle" onclick="OffsetPressed()">Offset OFF</button>
+	</div>
+	<script>
+	// speedArray to hold slider speed values
+	let speedArray = [0];
+	let stopState = 1;
+	let updateLimits = true;
+	// Sets 150ms interval between sendPosition being called
+	let printerval;
+	printerval = setInterval(() => sendPosition(), 150);			
+	
+	// When the start button is pressed 
+	function StartPressed() { 
+		var request = new XMLHttpRequest(); 
+		request.onreadystatechange = function() { 
+			if (this.readyState == 4) { 
+				if (this.status == 200) { 
+					if (this.responseText != null){ 
+						// If the start button is pressed after the stop button is pressed zero all the values.
+						// The user could have moved the slider since pressing the stop button but we don't
+						// the winch to start moving accidently so the user will have to move the slider 
+						// in order to confirm direction after pressing the start button 
+						if(stopState == 1){
+							document.getElementById("startLabel").innerHTML = this.responseText; 
+							document.getElementById("startLabel").className = "box Left Basic";
+							document.getElementById("speedValue").innerHTML = ""; 
+							document.getElementById("speedValue").className = "box Right Basic";
+							document.getElementById("speedSlider").value = 0; 
+							// Updates slider bar 
+							document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+							speedArray = [];	// Clear the speed buffer
+							speedArray[1] = 0;	// Add a zero to the buffer so the winch speed zeroes
+							stopState = 0;
+						} else { // If the start button is pressed again after already runnning just keep displaying the current message
+							document.getElementById("startLabel").innerHTML = this.responseText;
+						}
+					}
+				}
+			}
+		}
+		// Send the startButtonPressed HTML request 
+		request.open("GET", "startButtonPressed", true);
+		request.send();
+	}
+	
+	function StopPressed() { 
+		// Record that stop state has been entered 
+		stopState = 1;
+		var request = new XMLHttpRequest(); 
+		request.onreadystatechange = function() { 
+			if (this.readyState == 4) { 
+				if (this.status == 200) { 
+					if (this.responseText != null){ 
+						// Zero all the values
+						document.getElementById("startLabel").innerHTML = this.responseText; 
+						//document.getElementById("startLabel").className = "box Left Basic";
+						document.getElementById("outLabel").innerHTML = ""; 
+						document.getElementById("speedValue").innerHTML = ""; 
+						//document.getElementById("speedValue").className = "box Right Basic";
+						document.getElementById("speedSlider").value = 0; 
+						// Updates slider bar 
+						document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+						speedArray = [];
+						speedArray[1] = 0;
+					}
+				}
+			}
+		}
+		request.open("GET", "stopButtonPressed", true);
+		request.send();
+	}
+				  	
+	function ReadReload() {
+		var reloadRequest = "";
+		var request = new XMLHttpRequest(); 
+		request.onreadystatechange = function() {
+			if(this.readyState == 4){
+				if(this.status == 200) {
+					if(this.responseText != null) {
+						let reloadRequest = this.responseText; 
+						let receivedArray = reloadRequest.split("|"); 
+						// If the webpage has changed from local to remote the P1AM returns "Reload"
+						if(receivedArray[0] == "Reload") {
+							//Reload the page
+							window.location.reload();
+						} else if(receivedArray[0] == "timeout") {
+							// If in remote mode and the webpage times out (webpage is not active window and timeout is called)
+							// Zero all the values
+							if(receivedArray[1] == "stopped"){
+								document.getElementById("startLabel").innerHTML = "Stopped"; 
+							} else if (receivedArray[1] == "minErr"){
+								document.getElementById("startLabel").innerHTML = "Minimum amount of cable payed in!"; 
+							} else if (receivedArray[1] == "maxErr"){
+								document.getElementById("startLabel").innerHTML = "Maximum amount of cable payed out!"; 
+							}
+							document.getElementById("outLabel").innerHTML = ""; 
+							document.getElementById("speedValue").innerHTML = ""; 
+							document.getElementById("speedSlider").value = 0; 
+							// Updates slider bar 
+							document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+							stopState = 1;
+							updateLimits = true;
+							speedArray = [];
+							speedArray[1] = 0;
+						}
+					}
+				}
+			}
+		}
+		request.open("GET", "reload_request", true);
+		request.send(null);
+		// Poll for winch data
+		GetOutputData();
+		// call outputData and read reload every 300ms
+		setTimeout("ReadReload()", 300);		
+	}
+	
+	// Gets winch status
+	function GetOutputData() { 
+		var request = new XMLHttpRequest(); 
+		request.onreadystatechange = function() {
+			if (this.readyState == 4) { 
+				if(this.status == 200) { 
+					if (this.responseText != null) { 
+						let received = this.responseText; 
+						let myArray = received.split("|"); 
+						// If e-stop is pressed clear all the values
+						if (myArray[0] == "eStop pressed") {
+							document.getElementById("eBox").innerHTML = "E-STOP PRESSED!";
+							document.getElementById("eBox").className = "Full Red";
+							document.getElementById("startLabel").innerHTML = "Stopped";
+							document.getElementById("outLabel").innerHTML = ""; 
+							document.getElementById("speedValue").innerHTML = ""; 
+							document.getElementById("speedSlider").value = 0; 
+							// Updates slider bar 
+							document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+							stopState = 1;
+							speedArray = [];
+							speedArray[1] = 0;
+						// Else display that the winch is ready to run
+						} else if (myArray[0] == "eStop released") {
+							document.getElementById("eBox").innerHTML = "Ready to run";
+							document.getElementById("eBox").className = "Full Green";
+						}
+						// If the min limit is reached
+						if (myArray[3] == "minPayErr"){
+							// If the speed value isn't zero set it to zero
+							if(speedArray[0] != 0){
+								speedArray[1] = 0;
+							}
+							// Display min error message
+							document.getElementById("startLabel").innerHTML = "Minimum amount of cable payed in!";
+							document.getElementById("startLabel").className = "box Left Red";
+							document.getElementById("outLabel").innerHTML = ""; 
+							document.getElementById("speedValue").innerHTML = ""; 
+							document.getElementById("speedSlider").value = 0; 
+							document.getElementById("speedValue").className = "box Right Red";
+							// Updates slider bar 
+							document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+							stopState = 1;
+							// Else if max limit is reached
+						} else if (myArray[3] == "maxPayErr"){
+							// If the speed value isn't zero set it to zero
+							if(speedArray[0] != 0){
+								speedArray[1] = 0;
+							}
+							// Display max error message
+							document.getElementById("startLabel").innerHTML = "Maximum amount of cable payed out!";
+							document.getElementById("startLabel").className = "box Left Red";
+							document.getElementById("outLabel").innerHTML = ""; 
+							document.getElementById("speedValue").innerHTML = ""; 
+							document.getElementById("speedValue").className = "box Right Red";
+							document.getElementById("speedSlider").value = 0; 
+							// Updates slider bar 
+							document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+							stopState = 1;
+						}
+						
+						if (myArray[4] == "updateLimits"){
+							// Display the current value of the min and max limit in their respective input fields 
+							document.getElementById("minLimit").value = myArray[5];
+							document.getElementById("maxLimit").value = myArray[6];
+							document.getElementById("minLimitLabel").innerHTML = "Set MIN Limit " + myArray[7];
+							document.getElementById("maxLimitLabel").innerHTML = "Set MAX Limit " + myArray[7];
+						}
+							// Display if the limits were set 
+							document.getElementById("limitToggle").innerHTML = myArray[8];
+							document.getElementById("limitToggle").className = myArray[9];
+
+							document.getElementById("offsetToggle").innerHTML = myArray[10];
+							document.getElementById("offsetToggle").className = myArray[11];
+
+						// Always display the payout, speed, and send the NMEA string 
+						document.getElementById("payoutMeters").innerHTML = myArray[1];
+						document.getElementById("payoutSpeed").innerHTML = myArray[2];
+					}
+				}
+			}
+		}
+		request.open("GET", "/output_ajax_switch", true); 
+		request.send(null); 
+	}
+	
+	// If the min input field is updated
+	function SetMinLimit() {
+		let input = document.getElementById("minLimit");
+		// If the inputted value is higher then the max value limit it
+		if(parseInt(input.value) > parseInt(input.max)){
+			input.value = input.max;
+		// Else if the inputted value is lower than the min value limit it 
+		} else if (parseInt(input.value) < parseInt(input.min)){
+			input.value = input.min;
+		}
+		var request = new XMLHttpRequest();
+		// Build html string to send with min value embedded
+		var url = "/minLimitSet=" + document.getElementById("minLimit").value;
+		// Send html request with min limit which the P1AM then reads and sets
+		request.open("GET", url, true);
+		request.send();
+	}
+		
+	// If the max input field is updated
+	function SetMaxLimit() {
+		let input = document.getElementById("maxLimit");
+		// If the inputted value is higher then the max value limit it
+		if(parseInt(input.value) > parseInt(input.max)){
+			input.value = input.max;
+		// Else if the inputted value is lower than the min value limit it
+		} else if (parseInt(input.value) < parseInt(input.min)){
+			input.value = input.min;
+		}
+		var request = new XMLHttpRequest();
+		// Build html string to send with max vlaue embedded
+		var url = "/maxLimitSet=" + document.getElementById("maxLimit").value;
+		// Send html request with max limit which the P1AM then reads and sets
+		request.open("GET", url, true);
+		request.send();
+	}
+	
+	function sendPosition(){
+		// If the slider has moved or the  value has been zero'd update with the new value 
+		if(speedArray.length > 1){
+			// Shift the value of speedArray[1] -> speedArray[0]
+			speedArray.shift();
+			var request = new XMLHttpRequest();
+			var url = "/speedSlider=" + speedArray[0];
+			request.open("GET", url, true);
+			request.send();
+			request.onreadystatechange = function() { 
+				if (this.readyState == 4) { 
+					if (this.status == 200) { 
+						if (this.responseText != null){ 
+							let data = this.responseText;
+							let myArray = data.split("|");
+							// If min limit was reached
+							if(myArray[0] == "minErr"){
+								document.getElementById("startLabel").innerHTML = "Minimum amount of cable payed in!";
+								document.getElementById("startLabel").className = "box Left Red";
+								document.getElementById("speedValue").innerHTML = ""; 
+								document.getElementById("speedValue").className = "box Right Red";
+							// Else if max limit was reached
+							} else if(myArray[0] == "maxErr"){
+								document.getElementById("startLabel").innerHTML = "Maximum amount of cable payed out!";
+								document.getElementById("startLabel").className = "box Left Red";
+								document.getElementById("speedValue").innerHTML = ""; 
+								document.getElementById("speedValue").className = "box Right Red";
+							// Else print (running) (direction) (speed%)
+							} else {
+								document.getElementById("startLabel").innerHTML = myArray[0];
+								document.getElementById("outLabel").innerHTML = myArray[1];
+								document.getElementById("speedValue").innerHTML = myArray[2]; 
+							}
+						}
+					}
+				}
+			} 
+		}
+	}
+	
+	function sliderPreProcessing(){
+		// If stopState isn't active 
+		if(stopState == 0){
+			// Get the range value 
+			var slider = document.getElementById("speedSlider");
+			// Add the value to the end of the speedArray 
+			speedArray.push(slider.value);
+		}
+	}
+			
+	// before the webpage closes
+	function BeforeClose() { 
+		updateLimits = true;
+		stopState = 1;
+		// Set all the values to 0
+		document.getElementById("startLabel").innerHTML = "Stopped"; 
+		document.getElementById("startLabel").className = "box Left Basic";
+		document.getElementById("outLabel").innerHTML = ""; 
+		document.getElementById("speedValue").innerHTML = ""; 
+		document.getElementById("speedValue").className = "box Right Basic";
+		document.getElementById("speedSlider").value = 0;
+		// Updates slider bar 
+		document.getElementById("speedSlider").dispatchEvent(new Event('change'));
+		speedArray = [];
+		speedArray[1] = 0;
+		var request = new XMLHttpRequest(); 
+		request.open("GET", "/beforeClose", true); 
+		request.send(null); 
+		// Needs to have a return to trigger "are you sure you want to leave" pop up 
+		return "";
+	}
+	
+	// ----------------------------------- Adding the blue slider bar starting from the middle -----------------------------------------
+	// Listens for inputs from the slider 
+	let inputs = document.querySelectorAll("input[type=range]");
+	inputs.forEach((range) => {
+		// If the slider is released and it's value changes
+		range.addEventListener("change", () => {
+			// Then style the range
+			styleRange(range);
+		});
+		
+		// If the slider is pressed and it's value changes
+		range.addEventListener("input", () => {
+			// Then style the range
+			styleRange(range);
+		});
+	});
+	
+	function styleRange(input) {
+		// Sets how long the bar is
+		setWidth(input);
+		// Sets where the bar starts
+		setPosition(input);
+	}
+	
+	// How many steps has the slider moved? Fill from 0 to the current value
+	function setWidth(input) {
+		// Sets the width of the div class that wraps the slider (parent-input::before)
+		input.parentElement.style.setProperty(
+		// Styled property
+		"--before-width",
+		// assigned value
+		`${calcBeforeWidth(input)}px`,
+		);
+	}
+	
+	function setPosition(input) {
+		input.parentElement.style.setProperty(
+		// Styled property
+		"--before-left",
+		// assigned value
+		`${calcPositionLeft(input)}px`,
+		);
+	}
+  
+	function calcBeforeWidth(input) {
+				// Range Value * the width of each step of the range
+		return (Math.abs(input.value) * widthPerStep(input));
+	}
+  
+	function widthPerStep(input) {
+		// Reads all the style values from the range
+		const style = window.getComputedStyle(input);
+		// Gets the width of the range 
+		const totalWidth = parseFloat(style.getPropertyValue("width"));
+		// Calculates the length of each step for the range
+		return totalWidth / numberSteps(input);
+	}
+  
+	function numberSteps(input) {
+		// Returns the min + max to get the total number of steps
+		return Math.abs(input.min) + Math.abs(input.max);
+	}
+	function calcPositionLeft(input) {
+		const style = window.getComputedStyle(input);
+		const totalWidth = parseFloat(style.getPropertyValue("width"));
+		const inputHeight = parseFloat(style.getPropertyValue("height"));
+		// Sets the point which the slider is centered around 
+		if (0 >= input.value){
+		// inputHeight / 2 shifts the bar just right to keep it centered
+			return (totalWidth / 2) + (inputHeight / 2) - calcBeforeWidth(input);
+		}
+		return totalWidth / 2;
+	}
+	
+	function OffsetPressed() {
+		var request = new XMLHttpRequest();
+		request.onreadystatechange = function() {
+			if (this.readyState == 4) {
+				if (this.status == 200) {
+					if (this.responseText != null){
+						myArray = this.responseText.split("|");
+						// Set limit label as limits on or off
+						document.getElementById("offsetToggle").innerHTML = myArray[0];
+						document.getElementById("offsetToggle").className = myArray[1];
+					}
+				}
+			}
+		}
+		request.open("GET", "offsetTogglePressed", true);
+		request.send();
+	}
+	
+	function LimitPressed() {
+		var request = new XMLHttpRequest();
+		request.onreadystatechange = function() {
+			if (this.readyState == 4) {
+				if (this.status == 200) {
+					if (this.responseText != null){
+						myArray = this.responseText.split("|");
+						// Set limit label as limits on or off
+						document.getElementById("limitToggle").innerHTML = myArray[0];
+						document.getElementById("limitToggle").className = myArray[1];
+					}
+				}
+			}
+		}
+		request.open("GET", "limitTogglePressed", true);
+		request.send();
+	}
+	</script>
+</body></html>
