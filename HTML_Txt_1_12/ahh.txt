@@ -1,0 +1,2 @@
+document.getElementById(\"startLabel\").innerHTML = \"Minimum amount of cable payed in!\";\n\
+	document.getElementById(\"startLabel\").className = \"box Left Red\";\n\
