@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P1AM Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: #34495e;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        header {
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .ip-display {
+            background: #2c3e50;
+            padding: 8px 15px;
+            border-radius: 5px;
+            color: #2ecc71;
+            font-family: monospace;
+            font-size: 1rem;
+            margin: 10px 0;
+            display: inline-block;
+        }
+        
+        .control-panel {
+            background: #2c3e50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        
+        .input-group label {
+            display: block;
+            color: #ecf0f1;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #3498db;
+            border-radius: 5px;
+            background: #34495e;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #2ecc71;
+        }
+        
+        .control-button {
+            background: #27ae60;
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: block;
+            width: 100%;
+            margin: 20px 0 10px;
+            font-weight: bold;
+        }
+        
+        .control-button:hover {
+            background: #2ecc71;
+        }
+        
+        .status-panel {
+            background: #2c3e50;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        .status-title {
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        
+        .status-message {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+        }
+        
+        .led {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background-color: #444;
+        }
+        
+        .led.active {
+            background-color: #27ae60;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>P1AM Control</h1>
+            <div class="ip-display" id="ipDisplay">IP: 10.0.0.200</div>
+        </header>
+        
+        <div class="control-panel">
+            <h2>Command Interface</h2>
+            
+            <div class="input-group">
+                <label for="input1">Parameter 1:</label>
+                <input type="text" id="input1" placeholder="Enter value...">
+            </div>
+            
+            <div class="input-group">
+                <label for="input2">Parameter 2:</label>
+                <input type="text" id="input2" placeholder="Enter value...">
+            </div>
+            
+            <button class="control-button" id="actionButton">
+                <span class="led" id="statusLed"></span>
+                SEND PARAMETERS
+            </button>
+        </div>
+        
+        <div class="status-panel">
+            <div class="status-title">System Status</div>
+            <div class="status-message" id="statusMessage">Ready to send parameters to PLC</div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const actionButton = document.getElementById('actionButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusLed = document.getElementById('statusLed');
+        const ipDisplay = document.getElementById('ipDisplay');
+        const input1 = document.getElementById('input1');
+        const input2 = document.getElementById('input2');
+    
+        // Set current IP
+        ipDisplay.textContent = "IP: " + window.location.hostname;
+    
+        // Button click handler
+        actionButton.addEventListener('click', () => {
+            // Get values from both inputs
+            const value1 = input1.value.trim();
+            const value2 = input2.value.trim();
+            
+            // Check if both inputs have values
+            if (!value1 || !value2) {
+                statusMessage.textContent = "Please enter values in both fields!";
+                statusMessage.style.color = "#ff9800";
+                return;
+            }
+            
+            // Visual feedback
+            statusMessage.textContent = `Sending: ${value1}, ${value2} to PLC...`;
+            statusMessage.style.color = "white";
+            statusLed.classList.add('active');
+            actionButton.disabled = true;
+            
+            // Combine values with comma separator
+            const dataString = `${value1},${value2}`; 
+            
+            // Send request to Arduino with the combined data string
+            fetch(`/button?data=${dataString}`)
+                .then(response => {
+                    if (response.ok) {
+                        statusMessage.textContent = `Parameters sent successfully: ${value1}, ${value2}`;
+                        statusMessage.style.color = "#2ecc71";
+                        setTimeout(() => {
+                            statusMessage.textContent = "Ready for next command";
+                            statusMessage.style.color = "white";
+                        }, 3000);
+                    } else {
+                        statusMessage.textContent = "Error: " + response.status;
+                        statusMessage.style.color = "#ff5252";
+                    }
+                })
+                .catch(error => {
+                    statusMessage.textContent = "Connection error: " + error.message;
+                    statusMessage.style.color = "#ff5252";
+                })
+                .finally(() => {
+                    statusLed.classList.remove('active');
+                    actionButton.disabled = false;
+                });
+        });
+        
+        // Allow submitting with Enter key in either input
+        [input1, input2].forEach(input => {
+            input.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    actionButton.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
